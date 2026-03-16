@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  background: #050510;
+  color: #fff;
+}
+
+#ui {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud-top {
+  position: absolute;
+  top: 40px;
+  right: 40px;
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 0 0 10px #00f0ff;
+  color: #00f0ff;
+  font-family: monospace;
+  display: none;
+}
+
+#hud-bottom {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  text-align: right;
+  display: none;
+}
+
+#speedometer {
+  font-size: 72px;
+  font-weight: 900;
+  text-shadow: 0 0 20px #00f0ff;
+  color: #fff;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: 24px;
+  color: #00f0ff;
+}
+
+#nitro-bar {
+  width: 300px;
+  height: 10px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 5px;
+  margin-top: 10px;
+  overflow: hidden;
+  float: right;
+}
+
+#nitro-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #b000ff, #00f0ff);
+  box-shadow: 0 0 10px #b000ff;
+  transform-origin: left;
+  transition: transform 0.1s;
+}
+
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: bold;
+  color: #00f0ff;
+  text-shadow: 0 0 10px #00f0ff;
+  display: none; /* Hide until we start loading something */
+}
+
+#car-selector-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 40px;
+  border-radius: 20px;
+  border: 1px solid #00f0ff;
+  box-shadow: 0 0 50px rgba(0, 240, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+#car-selector-container h3 {
+  margin-top: 0;
+  color: #00f0ff;
+  font-size: 24px;
+  text-shadow: 0 0 10px #00f0ff;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+#car-selector button {
+  display: block;
+  width: 100%;
+  padding: 15px 30px;
+  margin-bottom: 15px;
+  background: transparent;
+  border: 1px solid #00f0ff;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: 8px;
+  letter-spacing: 1px;
+}
+
+#car-selector button:hover {
+  background: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 20px #00f0ff;
+  transform: scale(1.05);
+}
+
+#crosshairs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: #00f0ff;
+  border-radius: 50%;
+  opacity: 0.5;
+  box-shadow: 0 0 10px #00f0ff;
+  display: none;
+}
