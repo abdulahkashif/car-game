@@ -129,8 +129,15 @@ async function loadEnvironment() {
         
         // Physics Trimesh for road
         let vertices = child.geometry.attributes.position.array;
-        const indices = child.geometry.index ? child.geometry.index.array : null;
-        if (vertices && indices) {
+        let indices = child.geometry.index ? child.geometry.index.array : null;
+
+        if (vertices) {
+          // If no indices, create them for a non-indexed geometry
+          if (!indices) {
+            indices = new Uint32Array(vertices.length / 3);
+            for (let i = 0; i < indices.length; i++) indices[i] = i;
+          }
+
           // Handle Mesh Scaling
           const worldScale = new THREE.Vector3();
           child.getWorldScale(worldScale);
