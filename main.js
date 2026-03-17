@@ -33,10 +33,10 @@ const keys = { w:false, a:false, s:false, d:false, shift:false };
 
 // Physics Constants
 const HOVER_HEIGHT = 1.8;
-const SPRING_K = 700.0;
-const DAMPING_C = 80.0;
-const RAY_LENGTH = 5.0;
-const BASE_THRUST = 3000.0;
+const SPRING_K = 30000.0;
+const DAMPING_C = 2000.0;
+const RAY_LENGTH = 6.0;
+const BASE_THRUST = 10000.0;
 const NITRO_MULTIPLIER = 2.5;
 
 // ---- Three.js Setup ----
@@ -95,8 +95,11 @@ const physicsContactMaterial = new CANNON.ContactMaterial(physicsMaterial, physi
 world.addContactMaterial(physicsContactMaterial);
 
 // ---- Environment / Lighting ----
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
 scene.add(ambientLight);
+
+const hemiLight = new THREE.HemisphereLight(0x88aaff, 0x443333, 1.0);
+scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xaaccff, 2.0);
 dirLight.position.set(100, 200, 50);
@@ -118,15 +121,29 @@ async function loadEnvironment() {
   // 1. Load Road / Track
   loader.load('./road_template.glb', (gltf) => {
     const road = gltf.scene;
+    road.updateMatrixWorld(true);
     road.traverse(child => {
       if (child.isMesh) {
         child.receiveShadow = true;
         child.castShadow = true;
         
         // Physics Trimesh for road
-        const vertices = child.geometry.attributes.position.array;
+        let vertices = child.geometry.attributes.position.array;
         const indices = child.geometry.index ? child.geometry.index.array : null;
         if (vertices && indices) {
+          // Handle Mesh Scaling
+          const worldScale = new THREE.Vector3();
+          child.getWorldScale(worldScale);
+          if (worldScale.x !== 1 || worldScale.y !== 1 || worldScale.z !== 1) {
+            const scaledVertices = new Float32Array(vertices.length);
+            for(let i=0; i<vertices.length; i+=3) {
+              scaledVertices[i] = vertices[i] * worldScale.x;
+              scaledVertices[i+1] = vertices[i+1] * worldScale.y;
+              scaledVertices[i+2] = vertices[i+2] * worldScale.z;
+            }
+            vertices = scaledVertices;
+          }
+
           const trimeshShape = new CANNON.Trimesh(vertices, indices);
           const roadBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
           roadBody.addShape(trimeshShape);
@@ -202,18 +219,27 @@ function buildTrack() {
   const curve = new THREE.CatmullRomCurve3(curvePoints, true, 'centripetal');
   const tubeGeo = new THREE.TubeGeometry(curve, 300, 60, 24, true);
   const trackMat = new THREE.MeshStandardMaterial({
-    color: 0x001122,
+    color: 0x445566,
     roughness: 0.5,
     metalness: 0.9,
-    side: THREE.BackSide,
-    transparent: true,
-    opacity: 0.3
+    side: THREE.DoubleSide,
   });
   const trackMesh = new THREE.Mesh(tubeGeo, trackMat);
   scene.add(trackMesh);
 
+  // Add Stars
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = [];
+  for(let i=0; i<5000; i++) {
+    starPos.push((Math.random()-0.5)*2000, (Math.random()-0.5)*2000, (Math.random()-0.5)*2000);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: true });
+  const stars = new THREE.Points(starGeo, starMat);
+  scene.add(stars);
+
   const vertices = tubeGeo.attributes.position.array;
-  const indices = tubeGeo.getIndex().array;
+  const indices = tubeGeo.index.array;
   const trimeshShape = new CANNON.Trimesh(vertices, indices);
   const trackBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
   trackBody.addShape(trimeshShape);
@@ -287,10 +313,16 @@ function initCar(glbPath) {
 
   // Underglow lights
   for(let i=0; i<4; ++i) {
-    const plight = new THREE.PointLight(0x00f0ff, 2.0, 10);
+    const plight = new THREE.PointLight(0x00f0ff, 5.0, 20);
     carMesh.add(plight);
     hoverLights.push(plight);
   }
+  // Headlight
+  const headlight = new THREE.SpotLight(0xffffff, 10.0, 100, Math.PI/4, 0.5);
+  headlight.position.set(0, 0, -2);
+  headlight.target.position.set(0, 0, -10);
+  carMesh.add(headlight);
+  carMesh.add(headlight.target);
   hoverLights[0].position.set( 1.5, -0.5, -2.0);
   hoverLights[1].position.set(-1.5, -0.5, -2.0);
   hoverLights[2].position.set( 1.5, -0.5,  2.0);
@@ -328,12 +360,15 @@ function initCar(glbPath) {
             child.visible = false;
           }
           if (child.material) {
-            child.material.envMapIntensity = 2.0;
-            // Improve paint look
-            if (child.material.color) {
-               child.material.roughness = Math.min(child.material.roughness, 0.2);
-               child.material.metalness = Math.max(child.material.metalness, 0.7);
-             }
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+              mat.envMapIntensity = 2.0;
+              // Improve paint look
+              if (mat.color) {
+                mat.roughness = Math.min(mat.roughness, 0.2);
+                mat.metalness = Math.max(mat.metalness, 0.7);
+              }
+            });
           }
         }
       });
@@ -473,16 +508,21 @@ function updatePhysics(dt) {
   // Steering & Bank Turning
   if (keys.a) {
     // Yaw
-    const torque = worldUp.scale(2000);
+    const torque = worldUp.scale(15000);
     carBody.applyTorque(torque);
     // Bank Roll
-    carBody.applyTorque(worldForward.scale(1000));
+    carBody.applyTorque(worldForward.scale(5000));
   }
   if (keys.d) {
-    const torque = worldUp.scale(-2000);
+    const torque = worldUp.scale(-15000);
     carBody.applyTorque(torque);
-    carBody.applyTorque(worldForward.scale(-1000));
+    carBody.applyTorque(worldForward.scale(-5000));
   }
+
+  // Artificial Grip / Lateral Friction
+  const vel = carBody.velocity;
+  const lateralVel = worldRight.scale(vel.dot(worldRight));
+  carBody.applyForce(lateralVel.scale(-carBody.mass * 5), carBody.position);
 
   world.step(1/60, dt, 3);
 }
@@ -517,7 +557,11 @@ function updateCamera() {
   const targetCamPos = bodyPos.clone().add(idealOffset);
 
   // Smooth interpolation for camera position
-  camera.position.lerp(targetCamPos, 0.1);
+  camera.position.lerp(targetCamPos, 0.3);
+
+  // Smooth interpolation for camera UP vector (crucial for loops/anti-gravity)
+  const bodyUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bodyQuat);
+  camera.up.lerp(bodyUp, 0.2);
 
   // Look at somewhere in front of the car
   const forwardOffset = new THREE.Vector3(0, 0, -10).applyQuaternion(bodyQuat);
