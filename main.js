@@ -29,16 +29,16 @@ let modelPath = '';
 const clock = new THREE.Clock();
 
 // Variables for Input
-const keys = { w: false, a: false, s: false, d: false, shift: false };
+const keys = { w: false, a: false, s: false, d: false, shift: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false, ' ': false };
 
 // Physics Constants — tuned for stability
-const HOVER_HEIGHT = 1.5;
-const SPRING_K = 800.0;
-const DAMPING_C = 120.0;
-const RAY_LENGTH = 5.0;
-const BASE_THRUST = 4000.0;
-const NITRO_MULTIPLIER = 2.2;
-const MAX_SPEED = 80; // m/s cap to prevent runaway velocity
+const HOVER_HEIGHT = 1.6;
+const SPRING_K = 40000.0; // Significant increase to support 800kg mass
+const DAMPING_C = 2500.0; // Increase to stabilize the stronger spring
+const RAY_LENGTH = 6.0;
+const BASE_THRUST = 14000.0; // Increased to overcome drag and be faster
+const NITRO_MULTIPLIER = 2.4;
+const MAX_SPEED = 120; // m/s cap to prevent runaway velocity
 
 // ---- Three.js Setup ----
 const scene = new THREE.Scene();
@@ -250,7 +250,7 @@ function loadEnvironment() {
   const loader = new GLTFLoader();
 
   // Load Road
-  loader.load('./road_template.glb', (gltf) => {
+  loader.load('/road_template.glb', (gltf) => {
     const road = gltf.scene;
     road.traverse(child => {
       if (child.isMesh) {
@@ -264,19 +264,19 @@ function loadEnvironment() {
 
   // Load Trees
   const treeModels = [
-    './realistic_tree.glb',
-    './realistic_trees_pack_of_2_free.glb'
+    '/realistic_tree.glb',
+    '/realistic_trees_pack_of_2_free.glb'
   ];
 
   treeModels.forEach(path => {
     loader.load(path, (gltf) => {
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 15; i++) {
         const tree = gltf.scene.clone();
         const angle = Math.random() * Math.PI * 2;
-        const dist = 30 + Math.random() * 120;
+        const dist = 40 + Math.random() * 150;
         tree.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist - 100);
         tree.rotation.y = Math.random() * Math.PI * 2;
-        const s = 0.8 + Math.random() * 1.5;
+        const s = 1.0 + Math.random() * 2.0;
         tree.scale.set(s, s, s);
         tree.traverse(c => { if (c.isMesh) c.castShadow = true; });
         scene.add(tree);
@@ -285,14 +285,14 @@ function loadEnvironment() {
   });
 
   // Load Grass
-  loader.load('./realistics_grass_06.glb', (gltf) => {
+  loader.load('/realistics_grass_06.glb', (gltf) => {
     const grassBase = gltf.scene;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 80; i++) {
       const grass = grassBase.clone();
       const angle = Math.random() * Math.PI * 2;
-      const dist = 15 + Math.random() * 80;
+      const dist = 20 + Math.random() * 100;
       grass.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist - 100);
-      const s = 0.5 + Math.random() * 1.0;
+      const s = 0.8 + Math.random() * 1.5;
       grass.scale.set(s, s, s);
       scene.add(grass);
     }
@@ -303,12 +303,14 @@ loadEnvironment();
 
 // ---- Car / Hover System Initialization ----
 function initCar(glbPath) {
+  const correctedPath = glbPath.startsWith('/') ? glbPath : '/' + glbPath;
+
   carBody = new CANNON.Body({
     mass: 800,
     material: physicsMaterial,
-    linearDamping: 0.4,
-    angularDamping: 0.9,
-    position: new CANNON.Vec3(0, 3, 0), // Spawn above the ground plane
+    linearDamping: 0.3,
+    angularDamping: 0.7,
+    position: new CANNON.Vec3(0, 4, 0), // Spawn higher
   });
 
   const chassisShape = new CANNON.Box(new CANNON.Vec3(1.2, 0.4, 2.2));
@@ -379,10 +381,10 @@ function initCar(glbPath) {
 
   // Load GLB Model
   const loader = new GLTFLoader();
-  console.log('Loading car:', glbPath);
+  console.log('Loading car:', correctedPath);
 
   loader.load(
-    glbPath,
+    correctedPath,
     (gltf) => {
       uiLoader.style.display = 'none';
       const model = gltf.scene;
@@ -512,23 +514,29 @@ function updatePhysics(dt) {
 
   let currentThrust = 0;
 
-  if (keys.w) {
+  const moveUp = keys.w || keys.arrowup;
+  const moveDown = keys.s || keys.arrowdown;
+  const moveLeft = keys.a || keys.arrowleft;
+  const moveRight = keys.d || keys.arrowright;
+
+  if (moveUp) {
     currentThrust = BASE_THRUST;
-    if (keys.shift && nitroAmount > 0) {
+    const useNitro = keys.shift || keys[' '];
+    if (useNitro && nitroAmount > 0) {
       currentThrust *= NITRO_MULTIPLIER;
-      nitroAmount -= safeDt * 25;
+      nitroAmount -= safeDt * 30;
       isNitro = true;
     } else {
       isNitro = false;
-      if (!keys.shift && nitroAmount < 100) nitroAmount += safeDt * 5;
+      if (!useNitro && nitroAmount < 100) nitroAmount += safeDt * 6;
     }
   } else {
     isNitro = false;
     if (nitroAmount < 100) nitroAmount += safeDt * 8;
   }
 
-  if (keys.s) {
-    currentThrust = -BASE_THRUST * 0.4;
+  if (moveDown) {
+    currentThrust = -BASE_THRUST * 0.5;
   }
 
   // Only apply thrust when near ground
@@ -537,13 +545,14 @@ function updatePhysics(dt) {
   }
 
   // Steering
-  if (keys.a) {
-    carBody.applyTorque(worldUp.scale(3000));
-    carBody.applyTorque(worldForward.scale(800)); // bank
+  const steeringForce = 4500;
+  if (moveLeft) {
+    carBody.applyTorque(worldUp.scale(steeringForce));
+    carBody.applyTorque(worldForward.scale(1200)); // bank
   }
-  if (keys.d) {
-    carBody.applyTorque(worldUp.scale(-3000));
-    carBody.applyTorque(worldForward.scale(-800)); // bank
+  if (moveRight) {
+    carBody.applyTorque(worldUp.scale(-steeringForce));
+    carBody.applyTorque(worldForward.scale(-1200)); // bank
   }
 
   // Lateral friction (grip)
@@ -669,18 +678,38 @@ window.addEventListener('resize', () => {
 
 document.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (keys.hasOwnProperty(k)) keys[k] = true;
+  if (keys.hasOwnProperty(k)) {
+    keys[k] = true;
+  } else if (k === 'arrowup') {
+    keys.arrowup = true;
+  } else if (k === 'arrowdown') {
+    keys.arrowdown = true;
+  } else if (k === 'arrowleft') {
+    keys.arrowleft = true;
+  } else if (k === 'arrowright') {
+    keys.arrowright = true;
+  }
 });
 
 document.addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase();
-  if (keys.hasOwnProperty(k)) keys[k] = false;
+  if (keys.hasOwnProperty(k)) {
+    keys[k] = false;
+  } else if (k === 'arrowup') {
+    keys.arrowup = false;
+  } else if (k === 'arrowdown') {
+    keys.arrowdown = false;
+  } else if (k === 'arrowleft') {
+    keys.arrowleft = false;
+  } else if (k === 'arrowright') {
+    keys.arrowright = false;
+  }
 });
 
 // UI Selector
 buttons.forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    modelPath = e.target.getAttribute('data-model');
+  btn.addEventListener('click', () => {
+    modelPath = btn.getAttribute('data-model');
     uiSelector.style.display = 'none';
     uiLoader.style.display = 'block';
     setTimeout(() => {
