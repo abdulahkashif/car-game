@@ -34,7 +34,7 @@ const keys = { w: false, a: false, s: false, d: false, shift: false, arrowup: fa
 // Physics Constants — tuned for stability
 const HOVER_HEIGHT = 1.6;
 const SPRING_K = 40000.0; // Significant increase to support 800kg mass
-const DAMPING_C = 2500.0; // Increase to stabilize the stronger spring
+const DAMPING_C = 8500.0; // Increase to stabilize the stronger spring
 const RAY_LENGTH = 6.0;
 const BASE_THRUST = 14000.0; // Increased to overcome drag and be faster
 const NITRO_MULTIPLIER = 2.4;
@@ -213,11 +213,10 @@ function buildTrack() {
   scene.add(new THREE.Mesh(centerGeo, centerMat));
 
   // Physics ground plane for the track area — simple and stable
-  const groundShape = new CANNON.Plane();
-  const groundBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
-  groundBody.addShape(groundShape);
-  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0); // face up
-  world.addBody(groundBody);
+  const trackShape = new CANNON.Trimesh(trackVertices, trackIndices);
+  const trackBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
+  trackBody.addShape(trackShape);
+  world.addBody(trackBody);
 
   // Stars
   const starGeo = new THREE.BufferGeometry();
